@@ -105,7 +105,7 @@ namespace mce {
 		/*
 			The form is the only valid syntax in MCE.
 
-				(arg, arg, arg, ...)
+				$(arg, arg, arg, ...)
 
 			The first argument is the callback macro id and will after
 			it has been evaluated be used by the environment to find the
@@ -113,11 +113,23 @@ namespace mce {
 		*/
 		class form : public base {
 			private:
+				/*
+					The macro id.
+				*/
 				std::string d_form_macro_id;
+				/*
+					The arguments.
+				*/
 				std::vector<base *> d_arguments;
+				/*
+					Condition to see if a macro id was supplied with the construtor or not.
+				*/
 				bool d_expecting_macro_id;
 			public:
 				typedef std::vector<base *>::const_iterator const_iterator;
+				/*
+					Iteration over the arguments.
+				*/
 				const_iterator begin() const;
 				const_iterator end() const;
 				/*
@@ -128,11 +140,31 @@ namespace mce {
 					Returns true if the form has arguments.
 				*/
 				bool has_arguments() const;
+				/*
+					Constructor with explicit macro id. The macro id will otherwise be
+					taken from the first argument added to the form.
+				*/
 				form(text * macro_id);
+				/*
+					Constructor.	
+				*/
 				form();
+				/*
+					
+				*/
 				virtual bool eval(env & e, std::ostringstream & out, bool root = true) const;
+				/*
+					Add an argument to the form. If no macro id was supplied with the
+					constructor, then the first argument must be a apt::text object.
+				*/
 				bool add_argument(base * argument);
+				/*
+					Return the macro id.
+				*/
 				std::string const & get_macro_id() const;
+				/*
+					Destructor.
+				*/
 				~form();
 		};
 	

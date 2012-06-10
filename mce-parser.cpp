@@ -30,24 +30,16 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 namespace mce {
 
-//------------------------------------------------------------------------------
-namespace 
-{
-	template<typename T>
-	typename T::iterator last(T & v) {
-		typename T::iterator ii = v.end();
-		return --ii;
-	}
-	template<typename T>
-	void destroy(T & v) {
-		typename T::iterator pos = v.begin();
-		while(pos != v.end()) {
-			delete *pos;
-			++pos;
-		}
-	}
+template<typename T>
+typename T::iterator last(T & v) {
+	typename T::iterator ii = v.end();
+	return --ii;
 }
-//------------------------------------------------------------------------------	
+
+//------------------------------------------------------------------------------
+/*
+	Initializes the parser and calls parse_stream().
+*/	
 bool parser::scan(std::string const & infile, std::string const & outfile, env & e) 
 {
 	/*
@@ -66,34 +58,55 @@ bool parser::scan(std::string const & infile, std::string const & outfile, env &
 		debugf("MCE(parser::scan): Output file %s could not be opened!",outfile.c_str());
 		return false;
 	}
+	/*
+		Clear session states.
+	*/
 	d_env = &e;
 	d_env->get_scope().reset();
 	d_intend.clear();
 	/*
-		Proceed to parse the stream through a cursor.
+		Parse.
 	*/
 	stream_cursor cursor(buffer);
-	d_env->get_scope().reset();
 	return parse_stream(cursor);
 }
 //------------------------------------------------------------------------------
+/*
+	Removes spaces and tabs from the stream and returns its condition.
+*/
 bool parser::trim(stream_cursor & in) const
 {
-	/*
-		This function simply removes tabs and spaces and returns the
-		condition of the stream.
-	*/
 	while(in.good() && 
 		(in.accept(vars::mce_tab_char) || 
 			in.accept(vars::mce_space_char)));
 	return in.good();
 }
 //------------------------------------------------------------------------------
+/*
+	Prints a single character to the output file.
+*/
 void parser::print(unsigned char const & c)
 {
 	d_out << c;
 }
 //------------------------------------------------------------------------------
+/*
+	Prints a macro expansion.
+	Since a macro can expand into text that spans over multiple lines, we keep
+	track of where in the file the expansion occurs; this is the indentation
+	level. The indentation is calculated in parse_stream(). The first line
+	is printed at the current position, but all subsequent lines are prepended
+	by the indentation to line them up.
+	For example (where \_ is an escape for space):
+
+		\_\_\t$(M)
+
+	where M expands to "1\n2\3" will be printed as
+
+		"1\n"
+		"\_\_\t2\n"
+		"\_\_\t3"
+*/
 void parser::print(std::string const & text)
 {
 	std::istringstream in(text);
@@ -109,27 +122,35 @@ void parser::print(std::string const & text)
 	}
 }
 //------------------------------------------------------------------------------
+/*
+	It simply copies each character from the input file to the output file.
+	But while doing so it looks for the macro escape character.
+*/
 bool parser::parse_stream(stream_cursor & in) 
 {
-	/*
-		This loop will copy each character from the input to the output. Any
-		macros encountered will be expanded and its expansion will be printed
-		to the output. Control statements can temporarily close the scope and
-		thus prevent some text from being copied. 
-	*/
 	while(in.good()) {
+		/*
+			Check if the character is an escape character.
+		*/
 		if(check_macro_escape_character(in)) {
-			/*
-				Parse the macro into an abstract parse tree.
-			*/
 			apt::base * root_node = 0;
 			GUARD(root_node);
 			stream_cursor localin(in);
+			/*
+				Now we try to parse the macro into an abstract parse tree. 
+			*/
 			if(parse_macro(localin, root_node)) {
 				std::ostringstream out;
+				/*
+					Only if the evaluation succeeds to be print the expansion.
+				*/
 				if(root_node->eval(*d_env,out,true)) {
 					print(out.str());
 					in = localin;
+					/*
+						Since we have parsed a macro we will skip the default
+						copying below.
+					*/
 					continue;
 				}
 			}
@@ -166,6 +187,9 @@ bool parser::parse_stream(stream_cursor & in)
 	return true;
 }
 //------------------------------------------------------------------------------
+/*
+	Checks if the current character is an escape character.
+*/
 bool parser::check_macro_escape_character(stream_cursor & in) const
 {
 	/*
@@ -174,6 +198,9 @@ bool parser::check_macro_escape_character(stream_cursor & in) const
 	return in.match(vars::mce_escape_char);
 }
 //------------------------------------------------------------------------------
+/*
+	Tries to parse the escape character.
+*/
 bool parser::parse_macro_escape_character(stream_cursor & in) const
 {
 	/*
@@ -185,8 +212,8 @@ bool parser::parse_macro_escape_character(stream_cursor & in) const
 bool parser::parse_macro(stream_cursor & in, apt::base *& node) const
 {
 	/*
-		The macro form consist of a callback shaped like list. Between two
-		paranthesis the first element is the callback name, followed by any
+		The macro form consist of a callback shaped like list between two
+		parentheses. The first element is the callback name, followed by any
 		arguments separated with commas:
 
 			(id, arg, arg)
@@ -201,18 +228,18 @@ bool parser::parse_macro(stream_cursor & in, apt::base *& node) const
 
 		Which is the same as:
 
-			(id)
+			$(id)
 
 		Arguments are text strings, even if they are supplied as just numbers.
 		Without enclosing double qoutes, escape characters are disallowed,
 		spaces are collapsed and trailing spaces are removed. With double
 		qoutes everything is as it is, and escape characters are translated.
 
-			(id, some text , "yet more \n text",, 9)
+			$(id, some text , "yet more \n text",, 9)
 
 		Nested:
 
-			(print, (concatenate, hello, " world", $newline))
+			$(print, $(concatenate, hello, " world", $newline))
 
 		This function is recursively called to parse nested macro forms.
 	*/
@@ -221,18 +248,7 @@ bool parser::parse_macro(stream_cursor & in, apt::base *& node) const
 	if(!parse_macro_escape_character(localin)) {
 		return false;
 	}
-	/*
-		If the current character is a opening paranthesis, we'll assume we're
-		expecting a proper macro form. I.e.
 
-			(id, arg, arg)
-	*/
-	/*
-		Otherwise, if we find an escape character, it looks like there is
-		a syntactic suger macro form ahead. I.e.
-
-			$id
-	*/
 	if(!parse_macro_proper_form(localin, node)) {
 		if(!parse_macro_syntactic_suger_form(localin, node)) {
 			return false;
@@ -242,11 +258,15 @@ bool parser::parse_macro(stream_cursor & in, apt::base *& node) const
 	return true;
 }
 //------------------------------------------------------------------------------
+/*
+	Parses proper forms, i.e. arguments enclosed between parenthesis.
+	$(proper, macro, form)
+*/
 bool parser::parse_macro_proper_form(stream_cursor & in, apt::base *& node) const
 {
 	stream_cursor localin(in);
 	/*
-		Make sure the form starts with a opening paranthesis.
+		Make sure the form begin with an opening parentheses.
 	*/
 	if(!localin.accept(vars::mce_scope_open_char)) {
 		return false;
@@ -258,8 +278,8 @@ bool parser::parse_macro_proper_form(stream_cursor & in, apt::base *& node) cons
 		We loop and parse each argument in turn, until there are no more
 		valid arguments. We issue a preemptive break if there is no comma
 		after an argument. If a failed parse_macro_argument() ends the loop
-		it just means that there was trailing commas in the macro form, which
-		is perfectly valid. I.e.
+		it just means that there were trailing commas in the macro form
+		before the call, which is perfectly valid, i.e.
 
 			(id,,,,)
 
@@ -267,10 +287,15 @@ bool parser::parse_macro_proper_form(stream_cursor & in, apt::base *& node) cons
 		And the callback must be known at parse time.
 	*/
 	while(parse_macro_argument(localin, argument)) {
+		/*
+			The first argument is the macro id. If it is written wrong
+			then add_argument() will fail.
+		*/
 		if(!form->add_argument(argument)) {
 			debugf("MCE(parser::parse_macro_proper_form): Invalid form argument!");
 			debugf("MCE(parser::parse_macro_proper_form): Most likely the macro id is wrongly specified!");
-			debugf("MCE(parser::parse_macro_proper_form): @%i, '%s'", localin.get_row_number(), localin.get_current_row().c_str());
+			debugf("MCE(parser::parse_macro_proper_form): @%i, '%s'", 
+				localin.get_row_number(), localin.get_current_row().c_str());
 			return false;
 		}
 		if(!trim(localin)) {
@@ -285,11 +310,12 @@ bool parser::parse_macro_proper_form(stream_cursor & in, apt::base *& node) cons
 		RESTRICTIONS.
 	*/
 	/*
-		Make sure it isn't empty.
+		Make sure it is callable, which means that it has at least an id.
 	*/
 	if(!form->is_callable()) {
 		debugf("MCE(parser::parse_macro_proper_form): Empty forms are not allowed!");
-		debugf("MCE(parser::parse_macro_proper_form): @%i, '%s'", localin.get_row_number(), localin.get_current_partial_row().c_str());
+		debugf("MCE(parser::parse_macro_proper_form): @%i, '%s'", 
+			localin.get_row_number(), localin.get_current_partial_row().c_str());
 		return false;
 	}
 	/*
@@ -297,16 +323,20 @@ bool parser::parse_macro_proper_form(stream_cursor & in, apt::base *& node) cons
 	*/
 	if(!validate_callback(form->get_macro_id())) {
 		debugf("MCE(parser::parse_macro_proper_form): The callback must be known!");
-		debugf("MCE(parser::parse_macro_proper_form): @%i, '%s'", localin.get_row_number(), localin.get_current_partial_row().c_str());
-		debugf("MCE(parser::parse_macro_proper_form): '%s' is unkown.", form->get_macro_id().c_str());
+		debugf("MCE(parser::parse_macro_proper_form): @%i, '%s'", 
+			localin.get_row_number(), localin.get_current_partial_row().c_str());
+		debugf("MCE(parser::parse_macro_proper_form): '%s' is unkown.", 
+			form->get_macro_id().c_str());
 		return false;
 	}
 	/*
-		Make sure there is an ending paranthesis.
+		Make sure there is an ending parentheses.
 	*/
 	if(!localin.accept(vars::mce_scope_close_char)) {
-		debugf("MCE(parser::parse_macro_proper_form): Expected a closing '%c'!", vars::mce_scope_close_char);
-		debugf("MCE(parser::parse_macro_proper_form): @%i, '%s'", localin.get_row_number(), localin.get_current_partial_row().c_str());
+		debugf("MCE(parser::parse_macro_proper_form): Expected a closing '%c'!", 
+			vars::mce_scope_close_char);
+		debugf("MCE(parser::parse_macro_proper_form): @%i, '%s'", 
+			localin.get_row_number(), localin.get_current_partial_row().c_str());
 		return false;
 	}
 	in = localin;
@@ -314,6 +344,9 @@ bool parser::parse_macro_proper_form(stream_cursor & in, apt::base *& node) cons
 	return true;
 }
 //------------------------------------------------------------------------------
+/*
+	Parses macro arguments. 
+*/
 bool parser::parse_macro_argument(stream_cursor & in, apt::base *& node) const
 {
 	stream_cursor localin(in);
@@ -321,11 +354,8 @@ bool parser::parse_macro_argument(stream_cursor & in, apt::base *& node) const
 		return false;
 	}
 	/*
-		First we try to parse the argument as either an unqouted or a qouted 
-		text. If that fails, we try to see if it is a nested macro form.
-		Then we parse any equality operator tied to the argument.
-
-			$(if, $(employee no, 6) = Anna Karlsson)
+		First we see if the argument is simply either a qouted or uqouted
+		text argument. If not, see try to parse it as a macro form.
 	*/
 	if(basic_latin::is_basic_alpha(localin.current())) {
 		if(!parse_unquoted_text(localin,node)) {
@@ -340,7 +370,9 @@ bool parser::parse_macro_argument(stream_cursor & in, apt::base *& node) const
 	if(!parse_macro(localin,node)) {
 		return false;
 	}
-
+	/*
+		Finally we parse any comparison bound to the argument.
+	*/
 	if(!parse_binop(localin,node)) {
 		return false;
 	}
@@ -348,6 +380,25 @@ bool parser::parse_macro_argument(stream_cursor & in, apt::base *& node) const
 	return true;
 }
 //------------------------------------------------------------------------------
+/*
+	Macro forms without any arguments may be written in a shortened version:
+
+		$(noargs)
+
+	is the same as:
+
+		$noargs
+
+	The restriction is that the macro id can not be made up of multiple words:
+
+		$(no args)
+
+	is not valid as:
+
+		$no args
+
+	as only $no will be recognized.
+*/
 bool parser::parse_macro_syntactic_suger_form(stream_cursor & in, apt::base *& node) const
 {
 	stream_cursor localin(in);
@@ -355,24 +406,33 @@ bool parser::parse_macro_syntactic_suger_form(stream_cursor & in, apt::base *& n
 		We just need the macro id, and then we create an ordinary macro form.
 	*/
 	apt::text * id = 0;
+	GUARD(id);
 	if(parse_id(localin,id)) {
 		/*
-			Make sure the callback is known.
+			Make sure the callback is known. This is a copy of the same restriction
+			in parse_macro_proper_form().
 		*/
 		if(!validate_callback(id->value())) {
 			debugf("MCE(parser::parse_macro_proper_form): The callback must be known!");
 			debugf("MCE(parser::parse_macro_proper_form): @%i, '%s'", localin.get_row_number(), localin.get_current_partial_row().c_str());
 			debugf("MCE(parser::parse_macro_proper_form): '%s' is unkown.", id->value().c_str());
-			delete id;
 			return false;
 		}
-		node = new apt::form(id);
+		node = new apt::form(RELEASE(id));
 		in = localin;
 		return true;
 	}
 	return false;
 }
 //------------------------------------------------------------------------------
+/*
+	Arguments can be compared with other arguments.
+
+		$(id, me = you)
+		$(id, me # you)
+
+	The macro id can not be compared, only arguments.
+*/
 bool parser::parse_binop(stream_cursor & in, apt::base *& node) const
 {
 	stream_cursor localin(in);
@@ -381,11 +441,13 @@ bool parser::parse_binop(stream_cursor & in, apt::base *& node) const
 	}
 	/*
 		Only mce_equal and mce_not_equal are legal in a comparison context.
+		mce_equal being '=' and mce_not_equal being '#'.
 	*/
 	apt::base * part = 0;
 	if(!localin.match(vars::mce_equal_char) && !localin.match(vars::mce_not_equal_char)) {
 		/*
-			Yes, we fail with a true value.
+			Yes, we fail with a happy face. It isn't actually a failure. Since no
+			comparison character has been found, it is not a parse error.
 		*/
 		return true;
 	}
@@ -394,6 +456,9 @@ bool parser::parse_binop(stream_cursor & in, apt::base *& node) const
 	if(!trim(localin)) {
 		return false;
 	}
+	/*
+		We need the argument compared with.
+	*/
 	if(!parse_macro_argument(localin,part)) {
 		debugf("MCE(parser::parse_binop): Compare with what?");
 		debugf("MCE(parser::parse_binop): Saw '%c' but never the right hand.");
@@ -407,22 +472,18 @@ bool parser::parse_binop(stream_cursor & in, apt::base *& node) const
 		node = new apt::not_equal(node,part);
 	} else {
 		debugf("MCE(parser::parse_binop): This should not print.");
+		debugf("MCE(parser::parse_binop): Should have '%c' or '%c', but have instead '%c'!?",
+			vars::mce_equal_char, vars::mce_not_equal_char, comparison_char);
+		debugf("MCE(parser::parse_binop): This should not be possible. FATAL INTERNAL ERROR!");
 		return false;
 	}
-	/*
-	switch(comparison_char) {
-		case vars::mce_equal_char:
-			node = new apt::equal(node,part);
-			break;
-		case vars::mce_not_equal_char:
-			node = new apt::not_equal(node,part);
-			break;
-	}
-	*/
 	in = localin;
 	return true;
 }
 //------------------------------------------------------------------------------
+/*
+	Checks using the macro environment if the macro id is defined.
+*/
 bool parser::validate_callback(std::string const & id) const
 {
 	if(d_env->is_defined(id)) {
@@ -431,13 +492,13 @@ bool parser::validate_callback(std::string const & id) const
 	return false;
 }
 //------------------------------------------------------------------------------
+/*
+	Removes spaces, tabs and commas. Returns the condition of the stream.
+*/
 bool parser::trim_commas(stream_cursor & in) const
 {
 	/*
 		Localized stream_cursor not necessary. No backtracking is performed.
-	*/
-	/*
-		Removes any spaces and commas (empty components).
 	*/
 	while(trim(in)) {
 		if(!in.accept(vars::mce_comma_char)) {
@@ -447,6 +508,9 @@ bool parser::trim_commas(stream_cursor & in) const
 	return in.good();
 }
 //------------------------------------------------------------------------------
+/*
+	Parses qouted text. Anything is allowed between the qoutes.
+*/
 bool parser::parse_quoted_text(stream_cursor & in, apt::base *& node) const
 {
 	/*
@@ -483,6 +547,9 @@ bool parser::parse_quoted_text(stream_cursor & in, apt::base *& node) const
 	return false;
 }
 //------------------------------------------------------------------------------
+/*
+	Parses unqouted text.
+*/
 bool parser::parse_unquoted_text(stream_cursor & in, apt::base *& node) const
 {
 	/*
@@ -526,7 +593,7 @@ bool parser::parse_unquoted_text(stream_cursor & in, apt::base *& node) const
 		in.advance();
 	}
 	/*
-		Delete a trailing space.
+		Delete any trailing space.
 	*/
 	if(basic_latin::is_spacing(*last(parsed_text))) {
 		std::string::size_type length = parsed_text.length();
@@ -539,6 +606,11 @@ bool parser::parse_unquoted_text(stream_cursor & in, apt::base *& node) const
 	return false;
 }
 //------------------------------------------------------------------------------
+/*
+	Parses a macro id within the context of syntactic suger forms. It is almost
+	the same as unqouted text, but spaces are not allowed, hence disallowing
+	multiple words.
+*/
 bool parser::parse_id(stream_cursor & in, apt::text *& node) const
 {
 	/*
@@ -574,6 +646,9 @@ bool parser::parse_id(stream_cursor & in, apt::text *& node) const
 	return false;
 }
 //------------------------------------------------------------------------------
+/*
+	Returns true if the character used by the MCE parser.
+*/
 bool parser::is_special_character(unsigned char const & c) const
 {
 	if(c == vars::mce_escape_char) return true;
@@ -586,6 +661,9 @@ bool parser::is_special_character(unsigned char const & c) const
 	return false;
 }
 //------------------------------------------------------------------------------
+/*
+	Parses escape sequences and translates them.
+*/
 bool parser::parse_escaped_text(stream_cursor & in, std::string & unescaped_text) const
 {
 	stream_cursor localin(in);
@@ -606,9 +684,6 @@ bool parser::parse_escaped_text(stream_cursor & in, std::string & unescaped_text
 			case 'r': unescaped_text += '\r'; break;
 			case 'f': unescaped_text += '\f'; break;
 			case '_': unescaped_text += ' '; break;
-			//case 'N': unescaped_text += basic_latin::control::next_line; // NEL
-			// case 'P': return 0x2029; // PS
-			// case 'L': return 0x2028; // LS
 			/*
 				Just accept it as it is.
 			*/
@@ -620,6 +695,9 @@ bool parser::parse_escaped_text(stream_cursor & in, std::string & unescaped_text
 	return true;
 }
 //------------------------------------------------------------------------------
+/*
+	Translates escaped control characters.
+*/
 bool parser::translate_escaped_control_character(unsigned char & value) const
 {
 	switch(value) {

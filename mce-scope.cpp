@@ -19,11 +19,6 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 namespace mce {
 
 //------------------------------------------------------------------------------
-scope::~scope()
-{
-
-}
-//------------------------------------------------------------------------------
 void scope::push_scope(state s) 
 {
 	d_scopes.push_back(s);

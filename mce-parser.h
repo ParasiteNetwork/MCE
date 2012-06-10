@@ -41,8 +41,19 @@ namespace mce {
 	*/
 	class parser {
 		private:
+			/*
+				The user supplied environment.
+			*/
 			env * d_env;
+			/*
+				The output file.
+				TODO: Should probably use a std::ostream instead.
+			*/
 			std::ofstream d_out;
+			/*
+				Intendation counting. Used when macros expand over
+				multiple lines.
+			*/
 			std::string d_intend;
 		private:
 			bool trim(stream_cursor & in) const;
@@ -65,6 +76,11 @@ namespace mce {
 			bool parse_escaped_text(stream_cursor & in, std::string & unescaped_text) const;
 			bool translate_escaped_control_character(unsigned char & value) const;
 		public:
+			/*
+				scan()
+				Parses the named input file (infile) and produces the named output
+				file (outfile) using the macro environment (e).
+			*/
 			bool scan(std::string const & infile, std::string const & outfile, env & e);
 	};
 

@@ -14,6 +14,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
+
 #ifndef mce_filepathH_c035d76d_6a31_4140_af8c_2980fb929938
 #define mce_filepathH_c035d76d_6a31_4140_af8c_2980fb929938
 
@@ -21,10 +22,6 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <list>
 #include <ostream>
 
-// foo
-// bar/foo
-// /bar/foo
-// bar/foo/
 
 namespace mce {
 

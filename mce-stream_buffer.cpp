@@ -27,7 +27,7 @@ namespace mce
 
 // STREAM_BUFFER
 //------------------------------------------------------------------------------
-stream_buffer::stream_buffer()
+stream_buffer::stream_buffer() : d_buffer_length(0)
 {
 
 }

@@ -1,0 +1,12 @@
+MCE.sublime-workspace
+MCE.sublime-project
+
+*.o
+*.a
+*.out
+*.old
+*~
+.*~
+*.test
+main.cpp
+

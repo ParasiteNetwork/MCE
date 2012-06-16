@@ -1,17 +1,11 @@
 /*
-Copyright (c) 2012, PARASITE NETWORK AT CYPHER.NU
 
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
+	mce-parser.cpp
 
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+	Copyright (c) 2012, PARASITE NETWORK AT CYPHER.NU
+
+	GNU General Public License 3
+
 */
 
 
@@ -135,6 +129,9 @@ bool parser::parse_stream(stream_cursor & in)
 		if(check_macro_escape_character(in)) {
 			apt::base * root_node = 0;
 			GUARD(root_node);
+			/*
+				We localize the stream cursor to protect it.
+			*/
 			stream_cursor localin(in);
 			/*
 				Now we try to parse the macro into an abstract parse tree. 
@@ -148,7 +145,7 @@ bool parser::parse_stream(stream_cursor & in)
 					print(out.str());
 					in = localin;
 					/*
-						Since we have parsed a macro we will skip the default
+						Since we have expanded a macro we'll skip the default
 						copying below.
 					*/
 					continue;
@@ -266,7 +263,7 @@ bool parser::parse_macro_proper_form(stream_cursor & in, apt::base *& node) cons
 {
 	stream_cursor localin(in);
 	/*
-		Make sure the form begin with an opening parentheses.
+		Make sure the form begins with an opening parenthesis.
 	*/
 	if(!localin.accept(vars::mce_scope_open_char)) {
 		return false;
@@ -288,7 +285,7 @@ bool parser::parse_macro_proper_form(stream_cursor & in, apt::base *& node) cons
 	*/
 	while(parse_macro_argument(localin, argument)) {
 		/*
-			The first argument is the macro id. If it is written wrong
+			The first argument is the macro id. If it's written wrong
 			then add_argument() will fail.
 		*/
 		if(!form->add_argument(argument)) {
@@ -298,6 +295,9 @@ bool parser::parse_macro_proper_form(stream_cursor & in, apt::base *& node) cons
 				localin.get_row_number(), localin.get_current_row().c_str());
 			return false;
 		}
+		/*
+			Clean up spaces, tabs and commas.
+		*/
 		if(!trim(localin)) {
 			break;
 		}
@@ -330,7 +330,7 @@ bool parser::parse_macro_proper_form(stream_cursor & in, apt::base *& node) cons
 		return false;
 	}
 	/*
-		Make sure there is an ending parentheses.
+		Make sure there is an ending parenthesis.
 	*/
 	if(!localin.accept(vars::mce_scope_close_char)) {
 		debugf("MCE(parser::parse_macro_proper_form): Expected a closing '%c'!", 
@@ -355,7 +355,7 @@ bool parser::parse_macro_argument(stream_cursor & in, apt::base *& node) const
 	}
 	/*
 		First we see if the argument is simply either a qouted or uqouted
-		text argument. If not, see try to parse it as a macro form.
+		text argument. If not, we try to parse it as a macro form.
 	*/
 	if(basic_latin::is_basic_alpha(localin.current())) {
 		if(!parse_unquoted_text(localin,node)) {

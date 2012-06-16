@@ -1,17 +1,11 @@
 /*
-Copyright (c) 2012, PARASITE NETWORK AT CYPHER.NU
 
-Permission to use, copy, modify, and/or distribute this software for any
-purpose with or without fee is hereby granted, provided that the above
-copyright notice and this permission notice appear in all copies.
+	mce-stream_buffer.h
 
-THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
-WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
-ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
-OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+	Copyright (c) 2012, PARASITE NETWORK AT CYPHER.NU
+
+	GNU General Public License 3
+
 */
 
 
@@ -30,7 +24,7 @@ namespace mce {
 	FORWARD(stream_cursor)
 
 	/*
-		The stream_buffer class read the entire content of a file into
+		The stream_buffer class reads the entire content of a file into
 		a buffer. A stream_cursor can then navigate it.
 	*/
 	class stream_buffer {
@@ -41,7 +35,8 @@ namespace mce {
 			*/
 			std::string d_buffer;
 			/*
-				Basically the same as d_buffer.size().
+				Basically the same as d_buffer.size(). Just one indirection less,
+				and probably not really necessary.
 			*/
 			unsigned int d_buffer_length;
 		public:
@@ -63,7 +58,7 @@ namespace mce {
 			*/
 			bool compare(unsigned int const index, unsigned char const & c) const;
 			/*
-				Bound checking.
+				Bounds checking.
 			*/
 			bool is_valid_index(unsigned int index) const;
 	};
@@ -86,21 +81,68 @@ namespace mce {
 				Relative index in the current row.
 			*/
 			unsigned int d_row_index;
+			/*
+				Reference to the stream buffer.
+			*/
 			stream_buffer const & d_buffer;
 		public:
+			/*
+				Returns true if the current character matches 'c'.
+			*/
 			bool match(unsigned char const & c) const;
+			/*
+				Same as match(), but also moves the stream cursor
+				forward on success.
+			*/
 			bool accept(unsigned char const & c);
+			/*
+				Matches a text string.
+			*/
 			bool match(std::string const & text) const;
+			/*
+				Accepts a text string.
+			*/
 			bool accept(std::string const & text);
+			/*
+				Moves the stream cursor forward.
+			*/
 			bool advance();
+			/*
+				Returns true if the stream has not reached EOS.
+			*/
 			bool good() const;
+			/*
+				Returns the current character.
+			*/
 			unsigned char current() const;
+			/*
+				Copy constructor.
+			*/
 			stream_cursor(stream_cursor const & other);
+			/*
+				Constructor. 
+				Needs a stream buffer to operate on.
+			*/
 			stream_cursor(stream_buffer const & buffer);
+			/*
+				Assignment operator.
+			*/
 			void operator=(stream_cursor const & other);
+			/*
+				Returns the current row.
+			*/
 			std::string const get_current_row(unsigned char const & delim = '\n') const;
+			/*
+				Returns the current row upto where we are.
+			*/
 			std::string const get_current_partial_row() const;
+			/*
+				Returns the current row number.
+			*/
 			unsigned int get_row_number() const;
+			/*
+				Returns where we are on the current row. Local index.
+			*/
 			unsigned int get_caret() const;
 	};
 
